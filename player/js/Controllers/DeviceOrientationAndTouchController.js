@@ -39,12 +39,11 @@ THREE.DeviceOrientationAndTouchController = function( object, domElement, render
 	var tmpQuat = new THREE.Quaternion()
 	var deviceQuat = new THREE.Quaternion();
 	var mouse2D = new THREE.Vector2();
-	//var mouse3D = new THREE.Vector3();
     var tpCache = new Array();
 
     var _mouseMoved = false;
 
-	this.enableManualDrag = true;
+	//this.enableManualDrag = true;
 
 	function zoom(n) {
 		// Important! ==> [( 0 < camera.fov < 180 )]
@@ -87,43 +86,25 @@ THREE.DeviceOrientationAndTouchController = function( object, domElement, render
 	};
 
 	this.onDocumentMouseDown = function ( event ) {
-
 		event.preventDefault();
 
-		/*if ( autopositioning == false ) 
-		{
-			if ( Date.now() - touchtime > 300 ) touchcount = 0;
-
-			if (touchcount == 0) {
-				
-				touchcount++;
-				touchtime = Date.now();
-			}
-			else if (touchcount < 1) {
-				touchcount++;
-			}
-			else {
-				touchcount = 0;
-				menuMgr.initFirstMenuState();
-			}
-		}*/
-
-		//tmpQuat.copy( scope.objectPather.quaternion );
 		tmpQuat.copy( scope.object.quaternion );
 
 		startX = currentX = event.pageX;
 		startY = currentY = event.pageY;
 			
-		//var mouse3D = new THREE.Vector2();
         mouse2D.x = _isHMD ? 0 : ( event.clientX / window.innerWidth ) * 2 - 1;
         mouse2D.y = _isHMD ? 0 : - ( event.clientY / window.innerHeight ) * 2 + 1;
+
+        menuMgr.setMenuState(scene.getObjectByName('trad-main-menu').visible);
 		
-		//INTERACTIVITY DETECT
-		interController.checkInteraction(mouse2D, scope.object, 'onDocumentMouseDown');
-        if( !_isHMD && scene.getObjectByName('trad-main-menu') && scene.getObjectByName('trad-main-menu').visible) {
-	    	interController.checkInteractionVPB( mouse2D, scope.object);   
-        }
-		
+		if(!_isHMD){
+	        if(scene.getObjectByName('trad-main-menu') && scene.getObjectByName('trad-main-menu').visible) {
+		    	interController.checkInteractionVPB( mouse2D, scope.object);   
+	        }
+	        interController.checkInteractionCanvasElements(mouse2D, scope.object);
+		}
+	
 		//changing state 
 		appState = CONTROLLER_STATE.MANUAL_ROTATE;
 
@@ -140,44 +121,64 @@ THREE.DeviceOrientationAndTouchController = function( object, domElement, render
 
 
 	this.onDocumentMouseMove = function ( event ) {
+
 		// While the user has selected the slider in order to week, no video rotation is posible.
-		if ( event.pageX != startX && event.pageX != startX  && !sliderSelection)
-		{
+		if ( Math.abs(event.pageX - startX) > 2 && Math.abs(event.pageY -startY) > 2  && !elementSelection){
 			_mouseMoved = true;
 			currentX = event.pageX;
 			currentY = event.pageY;
 		}
 
- 		if( scene.getObjectByName('trad-main-menu') && scene.getObjectByName('trad-main-menu').visible ){
+		mouse2D.x = _isHMD ? 0 : ( event.clientX / window.innerWidth ) * 2 - 1;
+    	mouse2D.y = _isHMD ? 0 : - ( event.clientY / window.innerHeight ) * 2 + 1;
 
- 			mouse2D.x = _isHMD ? 0 : ( event.clientX / window.innerWidth ) * 2 - 1;
-        	mouse2D.y = _isHMD ? 0 : - ( event.clientY / window.innerHeight ) * 2 + 1;
+    	raycaster.setFromCamera(  mouse2D, scope.object );
 
-        	raycaster.setFromCamera(  mouse2D, scope.object );
-			/**
-			 * This function updates the position of the slider after 
-			 * been clicked and during the mousemmove event.
-			 */
-			mainMenuCtrl.updatePositionOnMouseMove(raycaster, sliderSelection);
-		}
+    	if(elementSelection){
+	 		if(elementSelection.name.localeCompare('slider-progress') == 0){
+				//This function updates the position of the slider after been clicked and during the mousemmove event.
+				mainMenuCtrl.updatePositionOnMove(raycaster, elementSelection);
+			} else if(elementSelection.name.localeCompare('radar') == 0 || elementSelection.name.localeCompare('signer') == 0 ||  elementSelection.name.localeCompare('subtitles') == 0){
+	            interController.checkInteractionGrid(raycaster, mouse2D);
+	    	}
+    	}
+
+		
 	}.bind( this );
 
 	this.onDocumentMouseUp = function ( event ) {
-
+		if(Math.abs(event.pageX - startX) < 2 && Math.abs(event.pageY -startY) < 2) _mouseMoved  = false;
 		if ( _blockControls ) initExtraAdAudio();
 
-		//if ( scene.getObjectByName( "openMenu" ).visible && !_mouseMoved ) menuMgr.initFirstMenuState();
-		else if ( menuMgr.getMenuType() == 2 && scene.getObjectByName( 'trad-main-menu' ).visible == false && !_mouseMoved ) menuMgr.initFirstMenuState();
-		else if ( menuMgr.getMenuType() == 1 && scene.getObjectByName( 'trad-option-menu' ).visible == false && scene.getObjectByName( 'trad-main-menu' ).visible == false && !_mouseMoved ) menuMgr.initFirstMenuState();
-		// scene.getObjectByName( 'trad-option-menu' ).visible == false && scene.getObjectByName( 'trad-main-menu' ).visible == false
-		_mouseMoved = false;
-
-		if (sliderSelection) {
-			mainMenuCtrl.setSlidingStatus(false);
-			mainMenuCtrl.onSlideSeek();
-			sliderSelection = null;
+		if(elementSelection){
+			//CODE DUPLICATES LOWER
+			switch(elementSelection.name){
+				case 'slider-progress':
+					mainMenuCtrl.setSlidingStatus(false);
+					mainMenuCtrl.onSlideSeek();
+					break;
+				case'radar':
+					canvas.getObjectByName('rdr-colorFrame').visible = false;
+	            	localStorage.setItem("rdrPosition", JSON.stringify(elementSelection.position));
+					break;
+				case'signer':
+					canvas.getObjectByName('sl-colorFrame').visible = false;
+            		localStorage.setItem("slPosition", JSON.stringify(elementSelection.position));
+					break;
+				case'subtitles':
+					canvas.getObjectByName('st-colorFrame').visible = false;
+					localStorage.setItem("stPosition", JSON.stringify(elementSelection.position));
+		            //This will remove the checkmark so all optins of st position are available.
+					if(actionPausedVideo) mainMenuCtrl.playAllFunc();
+					break;
+			}
+			menuMgr.checkMenuStateVisibility();
+			//canvas.getObjectByName('cnv-fov').visible = false;
+			elementSelection = null;
+		} else {
+			interController.checkInteraction(mouse2D, scope.object, _mouseMoved);
 		}
-
+		
 		this.element.removeEventListener( 'mousemove', this.onDocumentMouseMove, false );
 		this.element.removeEventListener( 'mouseup', this.onDocumentMouseUp, false );
 
@@ -187,62 +188,75 @@ THREE.DeviceOrientationAndTouchController = function( object, domElement, render
 		
 	}.bind( this );
 	
-	this.onDocumentTouchStart = function ( event ) {
 
+	this.onkeydownStart = function ( event ) {
+
+		switch ( event.keyCode ) 
+		{
+			case 37:  // left
+				scope.object.rotation.y += Math.PI/40;
+				break;
+
+			case 38:  // up
+				if ( scope.object.rotation.x < Math.PI/2 ) scope.object.rotation.x += Math.PI/20;
+				break;
+
+			case 39:  // right
+				scope.object.rotation.y -= Math.PI/40;
+				break;
+
+			case 40:  // down
+				if ( scope.object.rotation.x > -Math.PI/2 ) scope.object.rotation.x -= Math.PI/20;
+				break;
+
+			case 32:  // space
+				VideoController.isPausedById(0) ? _ImAc.doPlay() : _ImAc.doPause();
+				break;
+
+			case 49:  // 1
+				stConfig.isEnabled ? _stMngr.switchSubtitles( false ) : _stMngr.switchSubtitles( true );
+				break;
+
+			case 50:  // 2
+				slConfig.isEnabled ? _slMngr.switchSigner( false ) : _slMngr.switchSigner( true );
+				break;
+
+			case 51:  // 3
+
+				doZoom( 'in' );
+
+				break;
+
+			case 52:  // 4
+
+				doZoom( 'out' );
+
+				break;
+
+			case 77:  // m
+				if ( !autopositioning ) {
+					if (scene.getObjectByName( "openMenu" ) && scene.getObjectByName( "openMenu" ).visible ) menuMgr.initFirstMenuState();
+					else menuMgr.ResetViews();
+				}
+				break;
+				
+			default:
+				//console.log( event.keyCode )
+				break;
+		}
+
+	}.bind( this );
+
+	this.onDocumentTouchStart = function ( event ) {
         enterfullscreen();
 		event.preventDefault();
 		event.stopPropagation();
 
 		switch ( event.touches.length ) {
 			case 1: // ROTATE
-				if ( this.enableManualDrag !== true ) return;
-				if (autopositioning == true) {
-
-					if ( Date.now() - touchtime > 5000 ) touchcount = 0;
-
-					if (touchcount == 0) {
 						
-						touchcount++;
-						touchtime = Date.now();
-						navigator.vibrate([100]);
-					}
-					else if (touchcount < 4) {
-						touchcount++;
-						navigator.vibrate([50]);
-					}
-					else {
-						navigator.vibrate([500]);
-						touchcount = 0;
-						disableAutopositioning()
-					}
-					
-				}
-				/*else if ( scene.getObjectByName( "openMenu" ).visible ){
-
-					if ( Date.now() - touchtime > 300 ) touchcount = 0;
-
-					if (touchcount == 0) {
-						
-						touchcount++;
-						touchtime = Date.now();
-					}
-					else if (touchcount < 1) {
-						touchcount++;
-					}
-					else {
-						navigator.vibrate([200]);
-						touchcount = 0;
-						menuMgr.initFirstMenuState();
-					}
-				}*/
-				//touchtime = Date.now();
-			
-				//var mouse3D = new THREE.Vector2();
 				mouse2D.x = _isHMD ? 0 : ( event.touches[0].pageX / window.innerWidth ) * 2 - 1;
                 mouse2D.y = _isHMD ? 0 : - ( event.touches[0].pageY / window.innerHeight ) * 2 + 1;
-				
-				//INTERACTIVITY DETECT
-                interController.checkInteraction(mouse2D, scope.object, 'onDocumentMouseDown');
 
                 if(scene.getObjectByName('trad-main-menu') && scene.getObjectByName('trad-main-menu').visible) {
 			    	interController.checkInteractionVPB( mouse2D, scope.object);   
@@ -252,7 +266,6 @@ THREE.DeviceOrientationAndTouchController = function( object, domElement, render
 
 				scope.enabled = false;
 
-				//tmpQuat.copy( scope.objectPather.quaternion );
 				tmpQuat.copy( scope.object.quaternion );
 
 				startX = currentX = event.touches[ 0 ].pageX;
@@ -276,180 +289,51 @@ THREE.DeviceOrientationAndTouchController = function( object, domElement, render
 		}
 	}.bind( this );
 
-	var myangle = 0;
-
-	function disableAutopositioning()
-	{
-    	subController.disableAutoPositioning();
-		autopositioning = false;
-		if ( scene.getObjectByName('subtitlesIndicatorNoneButton') ) scene.getObjectByName('subtitlesIndicatorNoneButton').onexecute();
-		if ( scene.getObjectByName('signerIndicatorNoneButton') ) scene.getObjectByName('signerIndicatorNoneButton').onexecute();
-	}
-
-	this.onkeydownStart = function ( event ) {
-
-		switch ( event.keyCode ) 
-		{
-			case 27:  // Esc.
-				if ( autopositioning ) disableAutopositioning();
-				break;
-
-			case 37:  // left
-				scope.object.rotation.y += Math.PI/40;
-				break;
-
-			case 38:  // up
-				if ( scope.object.rotation.x < Math.PI/2 ) scope.object.rotation.x += Math.PI/20;
-				break;
-
-			case 39:  // right
-				scope.object.rotation.y -= Math.PI/40;
-				break;
-
-			case 40:  // down
-				if ( scope.object.rotation.x > -Math.PI/2 ) scope.object.rotation.x -= Math.PI/20;
-				break;
-
-			case 32:  // space
-				VideoController.isPausedById(0) ? _ImAc.doPlay() : _ImAc.doPause();
-				break;
-
-			case 49:  // 1
-				subController.getSubtitleEnabled() ? subController.disableSubtiles() : subController.enableSubtitles();
-				break;
-
-			case 50:  // 2
-				subController.getSignerEnabled() ? subController.switchSigner( false ) : subController.switchSigner( true );
-				break;
-
-			case 51:  // 3
-
-				doZoom( 'in' );
-
-				break;
-
-			case 52:  // 4
-
-				doZoom( 'out' );
-
-				break;
-
-			case 77:  // m
-				if ( !autopositioning ) {
-					//xxx.swichtMenuState();
-					if ( scene.getObjectByName( "openMenu" ).visible ) menuMgr.initFirstMenuState();
-					else menuMgr.ResetViews();
-				}
-				break;
-				
-			default:
-				//console.log( event.keyCode )
-				break;
-		}
-
-	}.bind( this );
-
 
 	this.onDocumentTouchMove = function ( event ) {
 
-		if ( Math.abs( startX - event.touches[ 0 ].pageX ) > 10 || Math.abs( startY - event.touches[ 0 ].pageY ) > 10 ) _mouseMoved = true;
+		const dpi = window.devicePixelRatio;
+		let difX = Math.abs( Math.round((startX - event.touches[0].pageX)/dpi));
+		let difY = Math.abs( Math.round(( startY - event.touches[ 0 ].pageY)/dpi)); 
 
-		if ( event.touches.length == 1 )
-		{
-			currentX = event.touches[ 0 ].pageX;
-			currentY = event.touches[ 0 ].pageY;
-		}
-
-		else if ( event.touches.length == 2 )
-		{
-			var point1=-1, point2=-1;
-			for (var i=0; i < tpCache.length; i++) {
-				if (tpCache[i].identifier == event.touches[0].identifier) point1 = i;
-				if (tpCache[i].identifier == event.touches[1].identifier) point2 = i;
-			}
-			if (point1 >=0 && point2 >= 0) {
-	 		// Calculate the difference between the start and move coordinates
-	 			var diff1 = tpCache[point1].pageX - event.touches[0].pageX;
-				var diff2 = tpCache[point2].pageX - event.touches[1].pageX;
-				// This threshold is device dependent as well as application specific
-				//var PINCH_THRESHHOLD = event.target.clientWidth / 10;
-				if ( ( tpCache[point1].pageX < tpCache[point2].pageX && (diff1 - diff2) > 0 ) || ( tpCache[point1].pageX > tpCache[point2].pageX && (diff2 - diff1) > 0 ) ) {
-					//zoom(Math.trunc((diff1 - diff2)/20));
-
-					if ( camera.fov == 60 ) {
-						camera.fov = 30;
-
-						camera.children.forEach( function( e ) 
-			        	{
-			        		//e.visible = pos == 'left' ? true : false;
-			        		e.scale.set( e.scale.x * 0.5, e.scale.y * 0.5, 1)
-			            }); 
-
-						camera.updateProjectionMatrix();
-					}
-
-
-				}
-				else {
-					//zoom(Math.trunc((diff2 - diff1)/20));
-
-					if ( camera.fov == 30 ) {
-
-						camera.fov = 60;
-
-						camera.children.forEach( function( e ) 
-			        	{
-			        		//e.visible = pos == 'left' ? true : false;
-			        		e.scale.set( e.scale.x * 2, e.scale.y * 2, 1)
-
-			            }); 
-						//camera.fovx += 10;
-						camera.updateProjectionMatrix();
-					}
-				}
-			}
-			else {
-				// empty tpCache
-				tpCache = new Array();
-			}
-		}
-
-		/*if( scene.getObjectByName('trad-main-menu') && scene.getObjectByName('trad-main-menu').visible ){
-
- 			mouse2D.x = _isHMD ? 0 : ( event.clientX / window.innerWidth ) * 2 - 1;
-        	mouse2D.y = _isHMD ? 0 : - ( event.clientY / window.innerHeight ) * 2 + 1;
-
-        	raycaster.setFromCamera(  mouse2D, scope.object );
-			/**
-			 * This function updates the position of the slider after 
-			 * been clicked and during the mousemmove event.
-			 //
-			mainMenuCtrl.updatePositionOnMouseMove(raycaster, sliderSelection);
-		}*/
-
-		/*switch( event.touches.length ) {
-			case 1:
+		if ( difX > 1 && difY > 1 && !elementSelection){
+			_mouseMoved = true;	
+			if ( event.touches.length == 1 ){
 				currentX = event.touches[ 0 ].pageX;
 				currentY = event.touches[ 0 ].pageY;
-				break;
+			}
+		} 
 
-			
-		}*/
+		mouse2D.x = _isHMD ? 0 : ( event.touches[0].pageX / window.innerWidth ) * 2 - 1;
+        mouse2D.y = _isHMD ? 0 : - ( event.touches[0].pageY / window.innerHeight ) * 2 + 1;
+
+    	raycaster.setFromCamera(  mouse2D, scope.object );
+
+    	if(elementSelection){
+	 		if(elementSelection.name.localeCompare('slider-progress') == 0){
+				//This function updates the position of the slider after been clicked and during the mousemmove event.
+				mainMenuCtrl.updatePositionOnMove(raycaster, elementSelection);
+			} 
+    	}
+
+
+
 	}.bind( this );
 
-	this.onDocumentTouchEnd = function ( event ) 
-	{
-		//if ( scene.getObjectByName( "openMenu" ).visible && !_mouseMoved ) menuMgr.initFirstMenuState();
-		if ( _blockControls ) initExtraAdAudio();
-		else if ( menuMgr.getMenuType() == 2 && scene.getObjectByName( 'trad-main-menu' ).visible == false && !_mouseMoved ) menuMgr.initFirstMenuState();
-		else if ( menuMgr.getMenuType() == 1 && scene.getObjectByName( 'trad-option-menu' ).visible == false && scene.getObjectByName( 'trad-main-menu' ).visible == false && !_mouseMoved ) menuMgr.initFirstMenuState();
-		
-		/*if (sliderSelection) {
-			mainMenuCtrl.setSlidingStatus(false);
-			mainMenuCtrl.onSlideSeek();
-			sliderSelection = null;
-		}*/
+	this.onDocumentTouchEnd = function ( event ) {
+		if ( _blockControls ){
+			initExtraAdAudio();
+		} 
 
+		if(elementSelection){
+	 		if(elementSelection.name.localeCompare('slider-progress') == 0){
+				mainMenuCtrl.setSlidingStatus(false);
+				mainMenuCtrl.onSlideSeek();
+			}
+			elementSelection = null;
+		} else {
+			interController.checkInteraction(mouse2D, scope.object, _mouseMoved);
+		}
 		_mouseMoved = false;
 
 		//startAllAudios();		
@@ -459,33 +343,25 @@ THREE.DeviceOrientationAndTouchController = function( object, domElement, render
 		this.element.removeEventListener( 'touchend', this.onDocumentTouchEnd, false );
 
 		if ( appState === CONTROLLER_STATE.MANUAL_ROTATE_DEVICE ) {
-
 			appState = CONTROLLER_STATE.AUTO; // reset control state
-
 			scope.enabled = true;
 		}
 	}.bind( this );
 
 	this.updateManualMove = function () {
 
-		var lat, lon;
-		var phi, theta;
-
-		var rotation = new THREE.Euler( 0, 0, 0, 'YXZ' );
-
-		var rotQuat = new THREE.Quaternion();
-		var objQuat = new THREE.Quaternion();
-
-		var tmpZ, objZ, realZ;
-
-		//var zoomFactor, minZoomFactor = 1; // maxZoomFactor = Infinity
+		let lat, lon;
+		let phi, theta;
+		let rotation = new THREE.Euler( 0, 0, 0, 'YXZ' );
+		let rotQuat = new THREE.Quaternion();
+		let objQuat = new THREE.Quaternion();
+		let tmpZ, objZ, realZ;
 
 		return function () {
 			
 			objQuat.copy( tmpQuat );
 
-			if ( appState === CONTROLLER_STATE.MANUAL_ROTATE && !autopositioning) 
-			{	
+			if ( appState === CONTROLLER_STATE.MANUAL_ROTATE && !autopositioning) {	
 				lat = ( startY - currentY ) * scrollSpeedY;
 				lon = ( startX - currentX ) * scrollSpeedX;
 
@@ -511,11 +387,8 @@ THREE.DeviceOrientationAndTouchController = function( object, domElement, render
 
 				//scope.objectPather.quaternion.copy( objQuat );
 				scope.object.quaternion.copy( objQuat );
-			} 
-			else if ( appState === CONTROLLER_STATE.MANUAL_ROTATE_DEVICE && !autopositioning) 
-			{				
-				if ( !_isHMD ) 
-				{
+			} else if ( appState === CONTROLLER_STATE.MANUAL_ROTATE_DEVICE && !autopositioning) {				
+				if ( !_isHMD ) {
 					lat = ( - startY + currentY ) * scrollSpeedY; 
 					phi	 = THREE.Math.degToRad( lat );  
 				}
@@ -526,8 +399,7 @@ THREE.DeviceOrientationAndTouchController = function( object, domElement, render
 				rotQuat.set( 0, Math.sin( theta / 2 ), 0, Math.cos( theta / 2 ) );
 				objQuat.multiply( rotQuat );
 
-				if ( !_isHMD ) 
-				{
+				if ( !_isHMD ) {
 					rotQuat.set( Math.sin( phi / 2 ), 0, 0, Math.cos( phi / 2 ) ); 
 					objQuat.multiply( rotQuat );
 				}
@@ -548,27 +420,26 @@ THREE.DeviceOrientationAndTouchController = function( object, domElement, render
 		};
 	}();
 
-	function sendVRInteraction(quat)
-	{
-		if ( _blockControls ) initExtraAdAudio();
-		else if ( menuMgr.getMenuType() == 2 && scene.getObjectByName( 'trad-main-menu' ).visible == false ) 
-		{
+	function sendVRInteraction(quat){
+		if (_blockControls){
+			initExtraAdAudio();
+		/*else if ( menuMgr.getMenuType() == 2 && scene.getObjectByName( 'trad-main-menu' ).visible == false ) {
 			menuMgr.initFirstMenuState();
-		}
-		else if ( menuMgr.getMenuType() == 1 && scene.getObjectByName( 'trad-option-menu' ).visible == false && scene.getObjectByName( 'trad-main-menu' ).visible == false ) 
-		{
-			menuMgr.initFirstMenuState();
-		}
-		else
-		{
+		}else if ( menuMgr.getMenuType() == 1 && scene.getObjectByName( 'trad-option-menu' ).visible == false && scene.getObjectByName( 'trad-main-menu' ).visible == false ) {
+			menuMgr.initFirstMenuState();*/
+		} else {
+			menuMgr.setMenuState(scene.getObjectByName('trad-main-menu').visible);
 			var direction = new THREE.Vector3( 0, 0, -1 );
 
 			direction.applyQuaternion( quat ).normalize();
 
-			interController.checkVRInteraction( _origin, direction );
-
 	    	interController.checkInteractionVPB( _origin, direction);
 
+        	if(canvas.getObjectByName('radar').visible || canvas.getObjectByName('signer') || canvas.getObjectByName('subtitles')){
+        		interController.checkInteractionCanvasElements( _origin, direction);
+        	}
+
+			interController.checkInteraction( _origin, direction, false);
 		}
 	}
 
@@ -577,12 +448,8 @@ THREE.DeviceOrientationAndTouchController = function( object, domElement, render
 	var openmenutimer = 0;
 	var openmenuinterval;
 
-	this.onVRControllerUpdate = function( event )
-	{
-		if ( !gamepadConnected ) 
-		{
-			console.log(event);
-
+	this.onVRControllerUpdate = function( event ){
+		if ( !gamepadConnected ) {
 			gamepadConnected = true;
 			_moData.createPointer2(); 
 
@@ -594,90 +461,71 @@ THREE.DeviceOrientationAndTouchController = function( object, domElement, render
 			controller.standingMatrix = renderer.vr.getStandingMatrix()
 
 			controller.addEventListener( 'primary press began', function( event ){
-				//event.target.userData.mesh.material.color.setHex( meshColorOn )
-				//startMenuInterval()
 				sendVRInteraction(event.target.quaternion)
 			})
 			controller.addEventListener( 'primary press ended', function( event ){
-				//event.target.userData.mesh.material.color.setHex( meshColorOff )
-				//stopMenuInterval()
-				if (sliderSelection) {
-					mainMenuCtrl.setSlidingStatus(false);
-					mainMenuCtrl.onSlideSeek();
-					sliderSelection = null;
-				}
+
+				if (elementSelection){
+					if( elementSelection.name.localeCompare('slider-progress') == 0 ){
+						mainMenuCtrl.setSlidingStatus(false);
+						mainMenuCtrl.onSlideSeek();
+					} else if( elementSelection.name.localeCompare('radar') == 0 ){
+						camera.getObjectByName('rdr-colorFrame').visible = false;
+						localStorage.setItem("rdrPosition", JSON.stringify(elementSelection.position));
+					} else if(elementSelection.name.localeCompare('signer') == 0){
+						canvas.getObjectByName('sl-colorFrame').visible = false;
+			            localStorage.setItem("slPosition", JSON.stringify(elementSelection.position));
+					}
+					//canvas.getObjectByName('cnv-fov').visible = false;
+					menuMgr.checkMenuStateVisibility();
+					elementSelection = null;
+				} 
 			})
 			controller.addEventListener( 'button_0 press began', function( event ){
-				//event.target.userData.mesh.material.color.setHex( meshColorOn )
-				//startMenuInterval()
 				sendVRInteraction(event.target.quaternion)
 			})
 			controller.addEventListener( 'button_0 press ended', function( event ){
-				//event.target.userData.mesh.material.color.setHex( meshColorOff )
-				//stopMenuInterval()
-				if (sliderSelection) {
-					mainMenuCtrl.setSlidingStatus(false);
-					mainMenuCtrl.onSlideSeek();
-					sliderSelection = null;
-				}
+				if (elementSelection){
+					if( elementSelection.name.localeCompare('slider-progress') == 0) {
+						mainMenuCtrl.setSlidingStatus(false);
+						mainMenuCtrl.onSlideSeek();
+					} else if(elementSelection.name.localeCompare('radar') == 0){
+						canvas.getObjectByName('rdr-colorFrame').visible = false;
+						localStorage.setItem("rdrPosition", JSON.stringify(elementSelection.position));
+					} else if(elementSelection.name.localeCompare('signer') == 0){
+						canvas.getObjectByName('sl-colorFrame').visible = false;
+			            localStorage.setItem("slPosition", JSON.stringify(elementSelection.position));
+					}
+					//canvas.getObjectByName('cnv-fov').visible = false;
+					menuMgr.checkMenuStateVisibility();
+					elementSelection = null;
+				} 
 			})	
 			controller.addEventListener( 'thumbpad press began', function( event ){
-				//event.target.userData.mesh.material.color.setHex( meshColorOn )
-				//startMenuInterval()
 				sendVRInteraction(event.target.quaternion)
 			})
 			controller.addEventListener( 'thumbpad press ended', function( event ){
-				//event.target.userData.mesh.material.color.setHex( meshColorOff )
-				//stopMenuInterval()
-				if (sliderSelection) {
-					mainMenuCtrl.setSlidingStatus(false);
-					mainMenuCtrl.onSlideSeek();
-					sliderSelection = null;
-				}
+				if (elementSelection){
+					if( elementSelection.name.localeCompare('slider-progress') == 0) {
+						mainMenuCtrl.setSlidingStatus(false);
+						mainMenuCtrl.onSlideSeek();
+					}else if(elementSelection.name.localeCompare('radar') == 0){
+						canvas.getObjectByName('rdr-colorFrame').visible = false;
+						localStorage.setItem("rdrPosition", JSON.stringify(elementSelection.position));
+					} else if(elementSelection.name.localeCompare('signer') == 0){
+						canvas.getObjectByName('sl-colorFrame').visible = false;
+			            localStorage.setItem("slPosition", JSON.stringify(elementSelection.position));
+					}
+					//canvas.getObjectByName('cnv-fov').visible = false;
+					menuMgr.checkMenuStateVisibility();
+					elementSelection = null;
+				}  
 			})	
 			controller.addEventListener( 'disconnected', function( event ){
 				controller.parent.remove( controller )
 			})
 		}
 	};
-
-	function startMenuInterval()
-	{
-		//if ( scene.getObjectByName( "openMenu" ).visible ) menuMgr.initFirstMenuState();
-		if ( menuMgr.getMenuType() == 2 && scene.getObjectByName( 'trad-main-menu' ).visible == false ) menuMgr.initFirstMenuState();
-		else if ( menuMgr.getMenuType() == 1 && scene.getObjectByName( 'trad-option-menu' ).visible == false && scene.getObjectByName( 'trad-main-menu' ).visible == false ) menuMgr.initFirstMenuState();
-		
-		/*if ( scene.getObjectByName( "openMenu" ).visible ) {
-			openmenuinterval = setInterval(function(){
-				openmenutimer++;
-				if ( openmenutimer == 3 ) menuMgr.initFirstMenuState();
-			}, 1000);
-		}
-		else {*/
-			/*if ( Date.now() - touchtime > 300 ) touchcount = 0;
-
-			if (touchcount == 0) {
-				
-				touchcount++;
-				touchtime = Date.now();
-			}
-			else if (touchcount < 1) {
-				touchcount++;
-			}
-			else {
-				touchcount = 0;
-				if ( scene.getObjectByName( "openMenu" ).visible ) menuMgr.initFirstMenuState();
-				else menuMgr.ResetViews();
-			}*/
-		//}
-	}
-
-	function stopMenuInterval()
-	{
-		clearInterval( openmenuinterval );
-		openmenutimer = 0;
-	}
-
 	
 
 	this.update = function() {
@@ -687,14 +535,13 @@ THREE.DeviceOrientationAndTouchController = function( object, domElement, render
 	        }	
 		}
 		
-		if (this.isAndroid && !autopositioning && _isHMD) {}
-		else if ( appState !== CONTROLLER_STATE.AUTO ) 
-		{
+		if (this.isAndroid && !autopositioning && _isHMD) {
+
+		} else if ( appState !== CONTROLLER_STATE.AUTO ) {
 			this.updateManualMove();	
 		}
 
-		if ( scene.getObjectByName('controller') )
-		{
+		if ( scene.getObjectByName('controller') ){
 			var direction = new THREE.Vector3( 0, 0, -1 );
 			var contr = scene.getObjectByName('controller');
 			var rot = contr.quaternion;
@@ -713,8 +560,7 @@ THREE.DeviceOrientationAndTouchController = function( object, domElement, render
         	var pointscale = menuMgr.getMenuType() == 1 ? 3*_pointerSize : 1*_pointerSize;
 
         	var p2 = scene.getObjectByName('pointer2').children[0];
-            if ( p2 )
-            {
+            if ( p2 ){
                 p2.position.x = direction2.x;
                 p2.position.y = direction2.y;
                 p2.position.z = direction2.z;
@@ -731,23 +577,23 @@ THREE.DeviceOrientationAndTouchController = function( object, domElement, render
 	            interController.vpbHoverOver( _origin, direction );
 	        }
 
-	        if(sliderSelection){
-				mainMenuCtrl.updatePositionOnMouseMove(raycaster, sliderSelection);
+	        if(elementSelection){
+		        if( elementSelection.name.localeCompare('slider-progress') == 0){
+					mainMenuCtrl.updatePositionOnMove(raycaster, elementSelection);
+		        } else if( elementSelection.name.localeCompare('radar') == 0 || elementSelection.name.localeCompare('signer') == 0){
+		            interController.checkInteractionGrid(raycaster, mouse2D);
+		    	}
 	        }
-
-		}
-		else if(_isHMD)
-		{
+		} else if(_isHMD){
 			var mouse3D = new THREE.Vector3( 0, 0, 0 );
-			
-			interController.checkInteraction( mouse3D, scope.object, 'onDocumentMouseMove' );
+
+			//interController.checkInteraction( mouse3D, scope.object, true );
 		}
 
 		_AudioManager.updateRotationMatrix( camera.matrixWorld.elements );
 	};
 	
-	this.connect = function() 
-	{	
+	this.connect = function() {	
 		window.addEventListener( 'resize', onWindowResize, false );	
 		window.addEventListener( 'vr controller connected', this.onVRControllerUpdate, false);	
 
@@ -759,8 +605,7 @@ THREE.DeviceOrientationAndTouchController = function( object, domElement, render
 		scope.enabled = true;
 	};
 
-	this.disconnect = function() 
-	{
+	this.disconnect = function() {
 		window.removeEventListener( 'resize', onWindowResize, false );	
 		window.removeEventListener( 'vr controller connected', this.onVRControllerUpdate, false);		
 

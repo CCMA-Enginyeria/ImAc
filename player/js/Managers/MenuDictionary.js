@@ -102,6 +102,8 @@ MenuDictionary = function() {
         safearea:        { ca: 'Area Segura'       , de: 'Darstellungsbereich', en: 'Safe Area'        , es: 'Area Segura'       },
     //                   ||                        ||                        ||                        ||                        ||
         save:            { ca: 'Guardar'           , de: 'Speichern'         , en: 'Save'              , es: 'Guardar'           },
+    //                   ||                        ||                        ||                        ||                        ||
+        scene:           { ca: 'Escena'            , de: 'UT alle 120°'      , en: 'Scene'             , es: 'Escena'            },
     //                   ||                        ||                        ||                        ||                        || 
         semitrans:       { ca: 'Semi-Trans'        , de: 'Kasten'            , en: 'Semi-Trans'        , es: 'Semi-Trans'        },
     //                   ||                        ||                        ||                        ||                        ||
@@ -112,6 +114,8 @@ MenuDictionary = function() {
         size:            { ca: 'Mida'              , de: 'Größe'             , en: 'Size'              , es: 'Tamaño'            },
     //                   ||                        ||                        ||                        ||                        ||
         small:           { ca: 'Petita'            , de: 'Klein'             , en: 'Small'             , es: 'Pequeño'           },
+    //                   ||                        ||                        ||                        ||                        ||
+        speaker:         { ca: 'Orador'           , de: 'UT am Sprecher'    , en: 'Speaker'           , es: 'Orador'           },
     //                   ||                        ||                        ||                        ||                        ||
         static:          { ca: 'Estàtic'            , de: 'Statisch'         , en: 'Static'            , es: 'Estático'          },
     //                   ||                        ||                        ||                        ||                        ||
@@ -181,7 +185,7 @@ MenuDictionary = function() {
     };
 
     this.isMainLanguageAvailable = function(lang){
-        return (subController.checkisSubAvailable(lang) || subController.checkisSignAvailable(lang) || 
+        return (_stMngr.checkisSubAvailable(lang) || _slMngr.checkisSignAvailable(lang) || 
                  _AudioManager.checkisADAvailable(lang) || _AudioManager.checkisASTAvailable(lang));
     };
 
@@ -224,5 +228,55 @@ MenuDictionary = function() {
     this.setMainLanguage = function(language){
         if ( language ) _mainLanguage = language;
     };
+
+
+//************************************************************************************
+// Public Ending Getters
+//************************************************************************************
+
+
+    this.getOption1Text = function()
+    {
+        var option1 = { 
+            ca: "T'ha agradat el vídeo?", 
+            de: 'Hat Ihnen das Video gefallen?', 
+            en: 'Did you like the video?', 
+            es: 'Te ha gustado el video?' };
+        
+        return option1[ _mainLanguage ];
+    }
+
+    this.getOption1Button = function()
+    {
+        var option1 = { 
+            ca: "Més vídeos", 
+            de: 'Mehr Videos', 
+            en: 'More videos', 
+            es: 'Mas videos' };
+        
+        return option1[ _mainLanguage ];
+    }
+
+    this.getOption2Text = function()
+    {
+        var option2 = { 
+            ca: "Necessitem els vostres comentaris per millorar els nostres serveis.", 
+            de: 'Um unsere Dienste weiter zu verbessern brauchen wir ihr Feedback.', 
+            en: 'We need your feedback to improve our services.', 
+            es: 'Necesitamos sus comentarios para mejorar nuestros servicios.' };
+        
+        return option2[ _mainLanguage ];
+    }
+
+    this.getOption2Button = function()
+    {
+        var option2 = { 
+            ca: "Qüestionari", 
+            de: 'Fragebogen', 
+            en: 'Questionnaire', 
+            es: 'Cuestionario' };
+        
+        return option2[ _mainLanguage ];
+    }
 
 }

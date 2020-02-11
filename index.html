@@ -41,7 +41,10 @@
 	  function gtag(){dataLayer.push(arguments);}
 	  gtag('js', new Date());
 
-	  gtag('config', 'UA-117913371-1');
+	  gtag('config', 'UA-117913371-1', {
+	  	cookie_expires: 604800, // 7 days
+	  	'anonymize_ip': true
+	  });
 	</script>
 
 </head>
@@ -675,6 +678,10 @@
 				      			<a href="https://www.youtube.com/channel/UCfxyfFgC97BCv_hmiGVfe1A" target="_blank">
 				      				<img title="youtube" src="./portal/img/iconos_footer/youtube.png" alt="youtube">
 				      			</a>
+				      			<!-- github -->
+				      			<a href="https://github.com/ua-i2cat/ImAc" target="_blank">
+				      				<img title="github" src="./portal/img/iconos_footer/GitHub-Mark-Light-32px.png" alt="github" style="width: 20px">
+				      			</a>
 				      		</div>
 				      	</div>
 			      		<!-- Help button -->
@@ -766,6 +773,5 @@
 			</div>
 		</div>
 	</footer>
-
 </body>	
 </html>

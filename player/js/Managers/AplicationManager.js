@@ -10,22 +10,13 @@ function AplicationManager()
     var _display;
 
     var mouse3D = new THREE.Vector2( 0, 0 );
+    var hmdTouchVector = new THREE.Vector2( 0, 0 );
 
     var button_1;
     var button_2;
 
     this.getRenderer = function() { return renderer };
 
-    // Used when autopositioning is activated
-    this.enableVR = function()
-    {
-    	renderer.vr.setDevice( _display[ 0 ] );
-    };
-
-    this.disableVR = function()
-    {
-    	renderer.vr.setDevice( null );
-    };
 
     this.disableVRButtons = function()
     {
@@ -43,7 +34,7 @@ function AplicationManager()
     	button_2 = button;
     };
 
-    this.getDisplays = function()
+    /*this.getDisplays = function()
     {
     	return _display;
     };
@@ -51,7 +42,7 @@ function AplicationManager()
     this.setDisplays = function(displays)
     {
     	_display = displays;
-    };
+    };*/
 
 	function activateLogger()
 	{
@@ -59,7 +50,7 @@ function AplicationManager()
 		{
 			setInterval(function(){
 				statObj.add( new StatElements() );
-			}, 500);
+            }, 500);
 		}
 	}
 
@@ -79,10 +70,13 @@ function AplicationManager()
 
 
         // Init World
-        camera = new THREE.PerspectiveCamera( 60.0, window.innerWidth / window.innerHeight, 1, 1000 );
+        camera = new THREE.PerspectiveCamera( 60.0, window.innerWidth / window.innerHeight, 1, 2000);
         camera.name = 'perspectivecamera';
         scene = new THREE.Scene();
         scene.add( camera );
+
+        vFOV = THREE.Math.degToRad( camera.fov ); // convert vertical fov to radians
+        vHeight = 2 * Math.tan( vFOV / 2 ) * canvasDistance; // visible height
 
         // Init Render
         renderer = new THREE.WebGLRenderer({
@@ -106,7 +100,7 @@ function AplicationManager()
 
         //scene.add( _moData.getSphericalVideoMesh( 100, mainContentURL, 'contentsphere' ) )
 
-        _isTV ? camera.add( _moData.getDirectiveVideo( mainContentURL, 'contentsphere' ) ) : scene.add( _moData.getSphericalVideoMesh( 100, mainContentURL, 'contentsphere' ) );
+        _isTV ? camera.add( _moData.getDirectiveVideo( mainContentURL, 'contentsphere' ) ) : scene.add( _moData.getSphericalVideoMesh( 1000, mainContentURL, 'contentsphere' ) );
 
         if ( 'getVRDisplays' in navigator ) {
 
@@ -117,7 +111,7 @@ function AplicationManager()
 
         	navigator.getVRDisplays().then( function ( displays ) 
         	{
-				_display = displays;
+				//_display = displays;
 				renderer.vr.enabled = true;
 				activateLogger();
 				renderer.animate( render );
@@ -129,6 +123,8 @@ function AplicationManager()
         runDemo();  
 
         initReticulum( camera );
+
+        canvasMgr.Init();
 
         document.addEventListener('mousemove', onDocumentMouseMove, false);
         //document.addEventListener('mousedown', onDocumentMouseDown, false);
@@ -145,8 +141,9 @@ function AplicationManager()
         _AudioManager.updateRotationMatrix( camera.matrixWorld.elements );
 
         if( THREE.VRController.getTouchPadState() && _isHMD ) 
-        {           
-            interController.checkInteraction( mouse3D, camera, 'onDocumentMouseDown' );
+        {   
+            interController.checkInteractionVPB( hmdTouchVector, camera, true );        
+            interController.checkInteraction( hmdTouchVector, camera, false, true );
 
             // function to open menu with a simple click
             if ( menuMgr.getMenuType() == 2 && scene.getObjectByName( 'trad-main-menu' ).visible == false ) 
@@ -159,18 +156,10 @@ function AplicationManager()
             }     
         }
 
-        if ( _isHMD && subController.getSubtitleEnabled() )
-        {
-            subController.updateSTRotation();
-        }
-        if ( _isHMD && subController.getSignerEnabled() )
-        {
-            subController.updateSLRotation();
-        }
+        if ( _isHMD ) canvas.rotation.z = -camera.rotation.z;
 
         if(camera.getObjectByName('radar') && camera.getObjectByName('radar').visible){
-            _rdr.updateRadarRotation();
-            _rdr.updateRadarPosition();
+            _rdr.updateRadarAreaRotation();
         }
 
         if( !_isHMD && scene.getObjectByName('trad-option-menu') ) {
@@ -182,13 +171,12 @@ function AplicationManager()
             interController.vpbHoverOver( mouse3D, camera )
         }
 
-        //Close menu if no interactivity for 5s;
-        if(isMenuInteracted){
-            isMenuInteracted = false;           
-            timerCloseMenu = setTimeout( function(){ menuMgr.ResetViews() }, 5000);
-        }
-
-        
+        var now = Date.now();
+        var dt = now - lastUpdate;
+        //Close menu if no interactivity for 10s;
+        if ( dt > 10000 && (scene.getObjectByName( "openMenu" ) && !scene.getObjectByName( "openMenu" ).visible) ) menuMgr.ResetViews();
+        //console.log(dt)
+       
         controls.update();
     }
 

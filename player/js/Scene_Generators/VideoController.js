@@ -14,7 +14,6 @@
     This library needs to use the global vars:
         * _ManifestParser
         * _Sync
-        * subController
         * mainMenuCtrl
         * scene
     
@@ -63,14 +62,14 @@ VideoController = function() {
 
     function setBitrateLimitationsFor(player)
     {
-    	if ( window.screen.width * window.devicePixelRatio <= 1920 ) 
+    	/*if ( window.screen.width * window.devicePixelRatio <= 1920 ) 
         {
             player.setMaxAllowedBitrateFor( 'video', 13000 );
         }
         else if ( window.screen.width * window.devicePixelRatio <= 2300 ) 
         {
             player.setMaxAllowedBitrateFor( 'video', 15000 );
-        }
+        }*/
     }
 
     function createDashVO(id, vid, url, autoplay)
@@ -78,9 +77,18 @@ VideoController = function() {
     	var player = dashjs.MediaPlayer().create();
         player.initialize( vid, url, autoplay );
 
+
         if ( navigator.userAgent.toLowerCase().indexOf("android") > -1 ) setBitrateLimitationsFor( player );
 
-        player.getDebug().setLogToBrowserConsole( false );
+        //player.getDebug().setLogToBrowserConsole( false );
+        player.updateSettings({
+            'debug': {
+                'logLevel': dashjs.Debug.LOG_LEVEL_WARNING
+                }
+            }
+        );
+
+        player.attachTTMLRenderingDiv( vid );
         
         var objVideo = { id: id, vid: vid, dash: player };
         listOfVideoContents.push( objVideo );
@@ -119,7 +127,7 @@ VideoController = function() {
                 if ( ft ) 
                 {
                     ft = false;
-                    _ManifestParser.init( listOfVideoContents[0].dash.geti2catMPD() );
+                    _ManifestParser.init( listOfVideoContents[0].dash.getDashAdapter().geti2catMPD() );
                 }
 
                 resolve( 'ok' );
@@ -143,7 +151,9 @@ VideoController = function() {
 
     function syncAll(dif)
     {  
-        dif = parseInt( dif*100 )/100;  
+        dif = parseInt( dif*100 )/100;
+
+        globalDiff = dif;  
 
         //console.log(dif) 
 
@@ -256,6 +266,36 @@ VideoController = function() {
         }
     };
 
+/**
+ * { function_description }
+ *
+ * @param      {<type>}  index         The index
+ * @param      {<type>}  source        The source
+ * @param      {<type>}  videoElement  The video element
+ */
+     this.play = function(index, source, videoElement){
+        let video = listOfVideoContents[index].vid;
+        video.currentTime = listOfVideoContents[0].vid.currentTime;
+        video.load();
+
+        fetch(source)
+            .then(response =>{ 
+                return video.play();
+            })
+            .then(_ => {
+                // Video playback started ;)
+                console.log(`Playing ${listOfVideoContents[index].id} video`);
+                videoElement.visible = true;
+            })
+            .catch(e => {
+                // Video playback failed ;(
+                console.error(e);
+                videoElement.visible = true;
+                video.pause();
+            });
+    };
+
+
     this.pauseAll = function()
     {
         if (document.dispatchEvent(pauseEvent)){ //Custom code
@@ -308,6 +348,7 @@ VideoController = function() {
     };
 
     var periodCount = 0;
+    var ending = false;
 
     /**
      * Initialize the library
@@ -320,19 +361,22 @@ VideoController = function() {
             periodCount += 1;
         });
 
-        //if ( localStorage.ImAc_roomID != undefined && localStorage.ImAc_roomID != "undefined" ) setTimeout( () => {  _Sync.init( "195.81.194.222", localStorage.ImAc_roomID ); }, 2000);
-
         getAdaptationSets().then(( str ) => { 
 
-            if ( localStorage.ImAc_roomID != undefined && localStorage.ImAc_roomID != "undefined" ) setTimeout( () => {  _Sync.init( "195.81.194.222", localStorage.ImAc_roomID ); }, 2000);
-
-            //subController.enableSubtitles();
             var firtsIteration = true;
-            listOfVideoContents[0].vid.ontimeupdate = function() 
+            listOfVideoContents[0].vid.ontimeupdate = function()
             {
-                if (listOfVideoContents[0].vid.currentTime >= listOfVideoContents[0].vid.duration - 0.5) window.location.reload();
+                // Video ending controller function
+                if (listOfVideoContents[0].vid.currentTime >= listOfVideoContents[0].vid.duration - 0.5 && !ending ) 
+                {
+                    ending = true;
+                    showEndingOptions();
+                }
 
-                subController.updateSubtitleByTime( listOfVideoContents[0].vid.currentTime );
+                // Update ST by time.
+                if (imsc1doc) {
+                    subController.updateISD(listOfVideoContents[0].vid.currentTime);
+                }
 
                 if ( _AudioManager.getADEnabled() ) checkExtraADListByTime( listOfVideoContents[0].vid.currentTime );
 
@@ -343,10 +387,11 @@ VideoController = function() {
                 }
                 if ( Math.trunc(listOfVideoContents[0].vid.currentTime)%10 == 0 && firtsIteration ) 
                 {
-                    syncAllVideos();
+                    if ( localStorage.ImAc_roomID != undefined && localStorage.ImAc_roomID != "undefined" ) _Sync.init( "195.81.194.222", localStorage.ImAc_roomID );
+                    else syncAllVideos();
                     firtsIteration = false;
                 }
-                else if ( Math.trunc(listOfVideoContents[0].vid.currentTime)%10 != 0 ) firtsIteration = true;
+                //else if ( Math.trunc(listOfVideoContents[0].vid.currentTime)%10 != 0 ) firtsIteration = true;
             }; 
         });
     };

@@ -4,25 +4,16 @@
 
 THREE.InteractionsController = function () {
 
-	var raycaster = new THREE.Raycaster();
-	var interactiveListObjects = [];
-	var interactionState = true;
-	var nameMenuActive;
-
-    var subtitlesActive = false;
-    var signerActive = false;
-    var pointerState = true;
-
-    var radarInteraction;
-
+	let raycaster = new THREE.Raycaster();
+	let interactiveListObjects = [];
+	let interactionState = true;
+    let pointerState = true;
+    let radarInteraction;
     let hoverSubMenuOpt = '';
     let hoverSubMenuOptColor;
-
     let hoverAccessIcon = '';
-
     let optionHoverAnimation;
     let hoverTimer;
-
     let tooltipVisible = false;
 
 
@@ -30,16 +21,8 @@ THREE.InteractionsController = function () {
 // Private Functions
 //************************************************************************************
 
-	function enableInteractions(){
-		interactionState = true;
-	}
-
-	function disableInteractions(){
-		interactionState = false;
-	}
-
 	function getInteractiveObjectList(){
-    return interactiveListObjects;
+        return interactiveListObjects;
 	}
 
   function freeInteractionState(time){
@@ -49,20 +32,9 @@ THREE.InteractionsController = function () {
     },time);
   }
 
-  function freePointerState(time){
-    var myVar = setTimeout(function(){
-      pointerState = true;
-      clearTimeout(myVar);
-    },time);
-  }
-
 //************************************************************************************
 // Public Setters
 //************************************************************************************
-
-	this.setActiveMenuName = function(name){
-		nameMenuActive = name;
-	}
 
 	this.getInteractiveObjectList = function (){
 		return interactiveListObjects;
@@ -72,13 +44,6 @@ THREE.InteractionsController = function () {
 // Public Getters
 //************************************************************************************
 
-	this.getInteractionState = function(){
-		return interactionState;
-	};
-
-	this.getActiveMenuName = function(){
-		return nameMenuActive;
-	};
 
 //************************************************************************************
 // Public Functions
@@ -97,7 +62,7 @@ THREE.InteractionsController = function () {
             raycaster.setFromCamera(  origin, direction );
         }
 
-        let elementArray = [ scene.getObjectByName('enhanced-menu-button'), scene.getObjectByName('close-button'),
+        let elementArray = [ scene.getObjectByName('enhanced-menu-button'),
                             scene.getObjectByName('show-st-button'), scene.getObjectByName('disable-st-button'),
                             scene.getObjectByName('show-sl-button'), scene.getObjectByName('disable-sl-button'),
                             scene.getObjectByName('show-ad-button'), scene.getObjectByName('disable-ad-button'), 
@@ -158,7 +123,7 @@ THREE.InteractionsController = function () {
             }
         } else{
             scene.getObjectByName("seek-progress").visible = false;
-            if (!sliderSelection){
+            if (!elementSelection){
                 scene.getObjectByName('slider-progress').visible = false;
             } 
         }
@@ -201,15 +166,17 @@ THREE.InteractionsController = function () {
 
                     //Change color on selection;
                     scene.getObjectByName(intersects[0].object.name).children[0].material.color.set( 0xffff00 );
-                    if (scene.getObjectByName(intersects[0].object.name).children.length > 1){
+                    if (scene.getObjectByName(intersects[0].object.name).children.length > 2){
                         scene.getObjectByName(intersects[0].object.name).children[1].material.color.set( 0xffff00 ); 
                         scene.getObjectByName(intersects[0].object.name).children[0].rotation.z = -Math.PI/8; //Rotate icon for animation
                         // Some time this error appears
                          
                         // Uncaught TypeError: Cannot read property 'children' of undefined (below lines)
-                        optionHoverAnimation = setTimeout( function(){ 
-                            scene.getObjectByName(intersects[0].object.name).children[0].rotation.z = 0; //Back to initial rotation.
-                        }, 150); 
+                        if(scene.getObjectByName(intersects[0].object.name)){
+                            optionHoverAnimation = setTimeout( function(){
+                                scene.getObjectByName(intersects[0].object.name).children[0].rotation.z = 0; //Back to initial rotation.                      
+                            }, 150); 
+                        }
                     }  
                     if (hoverSubMenuOpt && scene.getObjectByName(hoverSubMenuOpt)){
                         scene.getObjectByName(hoverSubMenuOpt).children[0].material.color.set( 0xe6e6e6 );
@@ -236,8 +203,70 @@ THREE.InteractionsController = function () {
     }
 
 
-    this.checkInteractionVPB = function(origin, direction){
+    this.checkInteractionGrid = function(raycaster, mouse2D){
+        var intersects = raycaster.intersectObjects([canvas.getObjectByName('cnv-background')] , true );
+
+        if (intersects[0]){
+            let v = new  THREE.Vector2(0,0);
+            v = intersects[0].object.worldToLocal(intersects[0].point);
+
+            switch(elementSelection.name){
+                case 'radar':
+                     _rdr.move(v);
+                    break;
+                case 'signer':
+                    _slMngr.move(v);
+                    break;
+                case 'subtitles':
+                    _stMngr.move(v);
+                    break;
+            }
+        }
+    }
+
+    this.checkInteractionCanvasElements = function(origin, direction){
         if(_isHMD){
+            raycaster.set( origin, direction );
+        } else{
+            raycaster.setFromCamera(  origin, direction );
+        }
+
+        let radarArray = [];
+        let signArray = [];
+        let subtitlesArray = [];
+        let menuArray = [];
+
+        if (scene.getObjectByName('radar').visible) radarArray = scene.getObjectByName('radar').children;
+        if (scene.getObjectByName('signer')) signArray = scene.getObjectByName('signer').children;
+        if (scene.getObjectByName('subtitles')) subtitlesArray = scene.getObjectByName('subtitles').children;
+        if (scene.getObjectByName('trad-main-menu').visible) menuArray = scene.getObjectByName('trad-main-menu').children;
+
+        let intersects = raycaster.intersectObjects( radarArray.concat(signArray).concat(subtitlesArray).concat(menuArray) , true );
+
+        if ( intersects[0]){
+            if(intersects[0].object.parent.name.localeCompare('radar') == 0){
+                camera.getObjectByName('rdr-colorFrame').visible = true;
+                elementSelection = intersects[0].object.parent;
+            } else if(intersects[0].object.parent.name.localeCompare('signer') == 0){
+                camera.getObjectByName('sl-colorFrame').visible = true;
+                elementSelection = intersects[0].object.parent;
+                _slMngr.scaleColorBorder(camera.getObjectByName('sl-colorFrame'))
+            } else if(intersects[0].object.parent.name.localeCompare('subtitles') == 0){
+                camera.getObjectByName('st-colorFrame').visible = true;
+                if(VideoController.isPausedById(0)){
+                    actionPausedVideo = false;
+                } else{
+                    actionPausedVideo = true;
+                    mainMenuCtrl.pauseAllFunc();
+                }
+                elementSelection = intersects[0].object.parent;
+            } 
+        }
+    }
+   
+
+    this.checkInteractionVPB = function(origin, direction, hmdTouch=false){
+        if(_isHMD && !hmdTouch){
             raycaster.set( origin, direction );
         } else{
             raycaster.setFromCamera(  origin, direction );
@@ -248,10 +277,15 @@ THREE.InteractionsController = function () {
 
         if ( intersects[0]){
             if(intersects[0].object.name.localeCompare('slider-progress') == 0){
-                sliderSelection = scene.getObjectByName('slider-progress');
-                mainMenuCtrl.setInitialSlidingPosition(sliderSelection.position.x);
-                if(sliderSelection){
-                    mainMenuCtrl.pauseAllFunc();
+                elementSelection = scene.getObjectByName('slider-progress');
+                mainMenuCtrl.setInitialSlidingPosition(elementSelection.position.x);
+                if(elementSelection){
+                    if(VideoController.isPausedById(demoId)){
+                        actionPausedVideo = false;
+                    } else{
+                        actionPausedVideo = true;
+                        mainMenuCtrl.pauseAllFunc();                    
+                    }
                 }
             } else {
                 mainMenuCtrl.onClickSeek(intersects[0].object.worldToLocal(intersects[0].point));
@@ -259,64 +293,54 @@ THREE.InteractionsController = function () {
         }
     }
 
-    this.checkInteraction = function(mouse3D, camera, type){
-        raycaster.setFromCamera( mouse3D, camera );
-        var intersects = raycaster.intersectObjects( interactiveListObjects, true ); // false
-
-        //Closes the open multi option menu of the traditional menu when clicked outside any element.
-        if(!intersects.length && menuMgr.getActualCtrl() && type != 'onDocumentMouseMove'){
-            SettingsOptionCtrl.close();
+    this.checkInteraction = function(origin, direction, _mouseMoved, hmdTouch=false){
+        if(_isHMD && !hmdTouch){
+            raycaster.set( origin, direction );
+        } else{
+            raycaster.setFromCamera(  origin, direction );
         }
 
-  	    if ( intersects[0] && interactionState && type != 'onDocumentMouseMove'){
-            isMenuInteracted = true;
-            if(timerCloseMenu) clearTimeout(timerCloseMenu);
-            
-            interactionState = false;
-  		    var intersectedShapeId;
-			for(var inter = 0; inter < intersects.length; inter++){
+        const intersects = raycaster.intersectObjects( interactiveListObjects, true ); // false
+  	    if ( intersects[0]){
+            if(interactionState){
+                lastUpdate = Date.now();
+                interactionState = false;
+      		    let intersectedShapeId;
+    			for(let inter = 0; inter < intersects.length; inter++){
+                    if ( localStorage.ImAc_cookies ) gtag('event', (_isHMD) ? 'VRInteraction' : 'UserInteraction', {
+                        'event_category' : 'PlayerConfig',
+                        'event_label' : intersects[inter].object.name,
+                        'anonymizeIp': true
+                    });
 
-                if ( localStorage.ImAc_cookies ) gtag('event', 'UserInteraction', {
-                    'event_category' : 'PlayerConfig',
-                    'event_label' : intersects[inter].object.name
-                });
+                    if ( loggerActivated ) statObj.add( new StatElements( intersects[inter].object.name ) );
 
-                if ( intersects[inter].object.type == 'Mesh' && intersects[inter].object.onexecute ){
-    	            intersects[inter].object.onexecute();
-    	            break;
-                }
-                else if ( intersects[inter].object.type == 'Mesh' && intersects[inter].object.name && intersects[inter].object.parent ){
-    				intersectedShapeId = intersects[inter].object.name;
-    				//console.error(intersectedShapeId);
-    				break;
-    			}
-                else console.error("Error in checkInteraction")
-    		}
-            freeInteractionState(500);
-	    }
-	};
 
-    this.checkVRInteraction = function(origin, direction){
-        raycaster.set( origin, direction );
-        var intersects = raycaster.intersectObjects( interactiveListObjects, true ); // false
-        if ( intersects[0] && interactionState ){
-            interactionState = false;
-            var intersectedShapeId;
-            for(var inter = 0; inter < intersects.length; inter++){
-
-                if ( localStorage.ImAc_cookies ) gtag('event', 'VRInteraction', {
-                    'event_category' : 'PlayerConfig',
-                    'event_label' : intersects[inter].object.name
-                });
-
-                if ( intersects[inter].object.type == 'Mesh' && intersects[inter].object.onexecute ){
-                    intersects[inter].object.onexecute();
-                    break;
+                    if ( intersects[inter].object.type == 'Mesh' && intersects[inter].object.onexecute ){
+        	            intersects[inter].object.onexecute();
+        	            break;
+                    } else if ( intersects[inter].object.type == 'Mesh' && intersects[inter].object.name && intersects[inter].object.parent ){
+        				intersectedShapeId = intersects[inter].object.name;
+        				break;
+                    } else console.error("Error in checkInteraction")
+        		}
+                freeInteractionState(300);
+            }
+	    } else{ 
+            //Closes the open multi option menu of the traditional menu when clicked outside any element.
+            if(!_mouseMoved && !elementSelection){
+                if(scene.getObjectByName('trad-option-menu') && menuMgr.getActualCtrl()){
+                    SettingsOptionCtrl.close();
+                } else{
+                    if(scene.getObjectByName('trad-main-menu').visible){
+                        menuMgr.ResetViews();
+                    } else {
+                        menuMgr.initFirstMenuState();
+                    }
                 }
             }
-            freeInteractionState(300);
         }
-    };
+	};
 
     function onMouseOver(name){
         onMouseOut();
@@ -357,23 +381,6 @@ THREE.InteractionsController = function () {
         tooltipVisible = false;
     }
 
-
-    this.getSubtitlesActive = function(){
-    	return subtitlesActive;
-    };
-
-    this.getSignerActive = function(){
-        return signerActive;
-    };
-
-    this.setSubtitlesActive = function(activated){
-        subtitlesActive = activated;
-    };
-
-    this.setSignerActive = function(activated){
-        signerActive = activated;
-    };
-
 /**
  * [description]
  * @param  {[type]} object [description]
@@ -405,12 +412,6 @@ THREE.InteractionsController = function () {
 		interactiveListObjects = interactiveListObjects.filter(e => e.name != name);
         controls.removeInteractiveObject(name);
 	}
-
-    this.removeInteractiveRadar = function(name){
-        radarInteraction = undefined;
-        interactiveListObjects = interactiveListObjects.filter(e => e.name != name);
-        controls.removeInteractiveObject(name);
-    }
 
     this.clearInteractiveObjectList = function(name){
         interactiveListObjects = [];

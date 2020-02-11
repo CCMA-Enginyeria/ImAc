@@ -63,9 +63,7 @@ function SettingsOptionMenuController() {
 	    	viewStructure.children.forEach(function(intrElement){
 	    		interController.removeInteractiveObject(intrElement.name);
 	    	});
-            //data.childColumnActiveOpt = undefined;
     	}
-
     }
 
 /**
@@ -87,9 +85,11 @@ function SettingsOptionMenuController() {
     }
 
     this.setChildColumnActiveOpt = function(name){
-        data.childColumnActiveOpt = name;
-        if ( scene.getObjectByName(name) ) data.default = scene.getObjectByName(name).children[0];
-        view.UpdateView(data);
+        if( scene.getObjectByName(name) ){
+            data.childColumnActiveOpt = name;
+            data.default = scene.getObjectByName(name);
+            view.UpdateView(data);
+        }
     }
 
 /**
@@ -164,7 +164,8 @@ function SettingsOptionMenuController() {
         data.title = MenuDictionary.translate( menuOpts.title );
         data.icon = menuOpts.icon;
         data.isPreviewVisible = menuOpts.preview ? true : false;
-
+        data.default = null;
+        
         options.forEach(function(opt, index){
             let dropdownIE = new InteractiveElementModel();
 
@@ -181,7 +182,9 @@ function SettingsOptionMenuController() {
             dropdownIE.onexecute = opt.function; 
             dropdownIE.position = new THREE.Vector3(0, h - (index+1)*optHeight, 0.01);
 
-            if((opt.default) ? opt.default() : false) data.default = dropdownIE;
+            if((opt.default) ? opt.default() : false){
+                data.default = dropdownIE;
+            } 
 
 
             dropdownInteractiveElements.push(dropdownIE.create());

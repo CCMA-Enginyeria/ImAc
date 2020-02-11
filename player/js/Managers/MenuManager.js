@@ -12,6 +12,8 @@ function MenuManager() {
     let menuActivationElement;
     let optActiveIndex;
 
+    let isMenuOpen;
+
 /**
  * { function_description }
  *
@@ -23,18 +25,14 @@ function MenuManager() {
         menuMgr.setMenuType(type);
 
         //The size depends on the menu type.
-        menuWidth = (menuType == 2) ? 70 : 130;
+        menuWidth = (menuType == 2) ? 80 : 130;
         menuHeight = menuWidth/4;
-        
-        menuParent = _isHMD ? scene : camera;
+
+        menuParent = _isHMD ? scene : canvas;
         menu = vwStrucMMngr.TraditionalMenu('trad-main-menu');
 
-
-        //Add the menu to the parent element.
         if (_isHMD) {
-            //console.log("This function is used. But is it vital?");
             menu.scale.set( 0.8, 0.8, 0.8 );
-            //traditionalmenu.scale.set( 0.8, 0.8, 0.8 );
         }
         menuParent.add(menu);
 
@@ -44,11 +42,7 @@ function MenuManager() {
             menu.add(settingsMenu);
         } else {
             menuParent.add(settingsMenu);
-        }
-
-        //Radar
-        let radar = _rdr.getRadarMeshGroup();
-        camera.add(radar);
+        }  
 
         mainMenuCtrl = new MainMenuController();
         controllers.push(mainMenuCtrl);
@@ -58,6 +52,8 @@ function MenuManager() {
 
         menuMgr.ResetViews();
     }
+
+    
 
     /**
      * Sets the option active index.
@@ -104,6 +100,19 @@ function MenuManager() {
         return menuType;
     }
 
+
+    this.setMenuState = function(state) {
+        isMenuOpen = state;
+    }
+
+    /**
+     * Gets the actual control.
+     *
+     * @return     {<type>}  The actual control.
+     */
+    this.getMenuState = function() {
+        return isMenuOpen;
+    }
 /**
  * { function_description }
  *
@@ -129,6 +138,13 @@ function MenuManager() {
             optActiveIndex = controller.getMenuIndex();
         }
         actualCtrl = controller;
+
+        if( scene.getObjectByName( "pointer2" ) && _isHMD ){
+            scene.getObjectByName( "pointer2" ).visible = true;
+        }else if( scene.getObjectByName( "pointer" ) && _isHMD ) {
+            scene.getObjectByName( "pointer" ).visible = true;
+            scene.getObjectByName('pointer').scale.set(1*_pointerSize,1*_pointerSize,1*_pointerSize)
+        }
     }
 
 /**
@@ -151,9 +167,6 @@ function MenuManager() {
             scene.getObjectByName( "pointer" ).visible = false;
             scene.getObjectByName('pointer').scale.set(1*_pointerSize,1*_pointerSize,1*_pointerSize);
         }
-
-        //playpauseCtrl.playAllFunc();
-        mainMenuCtrl.playAllFunc();
 
         if(menu) {
             menu.visible = false;
@@ -212,7 +225,7 @@ function MenuManager() {
  * @function initFirstMenuState (name)
 */
     this.initFirstMenuState = function() {
-        isMenuInteracted = true;
+        lastUpdate = Date.now();
         menuActivationElement.visible = false;
         scene.getObjectByName( "openmenutext" ).visible = false;
 
@@ -230,67 +243,29 @@ function MenuManager() {
 
         if (_isHMD) {
             resetMenuPosition( menu )
+            if(menuMgr.getMenuType() == 1) resetMenuPosition( settingsMenu )
         }
 
         menu.visible = true;
-
-       //timerCloseMenu = setTimeout( function(){ menuMgr.ResetViews() }, 5000);       
-
     }
 
-/**
- * Opens a preview during 2000ms. This function pauses the video so the user does not loose any content time.
- * The preview consists of a pre visualitzation of the enabled access service users settings.
- *
- * @function      OpenPreview (name)
- */
-    this.OpenPreview = function() {
+    this.checkMenuStateVisibility = function() { 
         let isSubmenuOpen = false; //Settings option menu state;
-        let autoPause = false; //Has the video been paused due to opening the preview.
-        let previewMesh = vwStrucMMngr.Preview('preview'); //Preview structre
-        previewCtrl = new PreviewController(); //Preview controller from the model (MVC);
-
-        //Save the settings options menu state (open/close) in isSubmenuOpen variable;
+         
         if(actualCtrl && actualCtrl.getMenuName() === 'trad-option-menu') {
             isSubmenuOpen = true;
         }
-        //If the video is already paused, do not apuse it again
-        if(!VideoController.isPausedById(0)){
-            autoPause = true; //The auto pasue in preview state is active.
-            VideoController.pauseAll(); //Auto pause the video during the preview.
-        }
-        //Add the preview element to the camera so the preview is allways centered in the user FoV.
-        camera.add(previewMesh);
-        //Remove all the menu elements from the camera/scene;
-        menuMgr.ResetViews();
-        //Start the preview visualitzation.
-        previewCtrl.Init();
-        //Return to the previous menu state in 2000ms.
-        setTimeout(function() {
-            //Close the preview.
-            previewCtrl.Exit();
-            //Only play if the auto pause is active. If the video was paused in first state do not play it.
-            if(autoPause){
-                VideoController.playAll();
-            }
-            //Start the menu in the first state.
-            if(menuMgr.getMenuType() == 2){
-                menuMgr.initFirstMenuState();
-            } 
-            //Open the settings option menu if it was already open before opening the preview.
-            if(isSubmenuOpen){
-              menuMgr.Load(SettingsOptionCtrl);  
-            } 
-            //Show subtitles if they where enabled.
-            if(scene.getObjectByName("subtitles")){
-                scene.getObjectByName("subtitles").visible = subController.getSubtitleEnabled();
-            }
-            //Show signer if it was enabled.
-            if(scene.getObjectByName("sign")) {
-                scene.getObjectByName("sign").visible = subController.getSignerEnabled();
-            }
-        },3000);
+
+        if(menuMgr.getMenuType() == 2){
+            scene.getObjectByName('trad-option-menu').visible = isSubmenuOpen;
+            scene.getObjectByName('trad-main-menu').visible = (isSubmenuOpen) ? isSubmenuOpen : menuMgr.getMenuState();
+
+        } else{
+            scene.getObjectByName('trad-option-menu').visible = isSubmenuOpen;
+            scene.getObjectByName('trad-main-menu').visible = !isSubmenuOpen;
+        } 
     }
+
 
 
 /**
@@ -322,10 +297,7 @@ function MenuManager() {
  * @param      {<type>}  object  The object
  */
     function resetMenuPosition(object) {
-        object.position.x = 0;
-        object.position.z = 0;
         object.rotation.y = camera.rotation.y;
-
         object.position.x = Math.sin(-camera.rotation.y)*67;
         object.position.z = -Math.cos(camera.rotation.y)*67;
     }

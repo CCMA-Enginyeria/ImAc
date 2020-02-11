@@ -63,6 +63,8 @@ function MainMenuController() {
     let initialSlidingPos;
     let newSeekTime;
 
+    let index = 1;
+
     /**
      * This function initializes and update all the datat and 
      * views of the different groups that compose the main menu.
@@ -115,7 +117,7 @@ function MainMenuController() {
         //Works if the viewStructure is loaded.
         menuMgr.setOptActiveIndex(0); //SettingsController
 
-        if(viewStructure){
+        if (viewStructure) {
             viewStructure.visible = false;
             viewStructure.children.forEach(function(intrElement){
                 interController.removeInteractiveObject(intrElement.name);
@@ -129,7 +131,7 @@ function MainMenuController() {
      * @return     {<MainMenuModel>}  The data model.
      */
     function GetData(){
-        if (data == null){
+        if (data == null) {
             data = new MainMenuModel();
         }
         return data;
@@ -188,13 +190,26 @@ function MainMenuController() {
                         scene.getObjectByName( "pointer2" ).visible = true;
                     }else if( scene.getObjectByName( "pointer" ) && _isHMD ) {
                         scene.getObjectByName( "pointer" ).visible = true;
-                        scene.getObjectByName('pointer').scale.set(1*_pointerSize,1*_pointerSize,1*_pointerSize)
+                        scene.getObjectByName('pointer').scale.set(1*_pointerSize,1*_pointerSize,1*_pointerSize);
                     }
                 }
-                menuMgr.Load(SettingsOptionCtrl)
+                menuMgr.Load(SettingsOptionCtrl);
             });
         };
-        data.previewButtonFunc = function(){ AddVisualFeedbackOnClick(settingsView, 'preview-button', function(){menuMgr.OpenPreview()} )};
+        //data.previewButtonFunc = function(){ AddVisualFeedbackOnClick(settingsView, 'preview-button', function(){menuMgr.OpenPreview()} )};
+        data.zoomButtonFunc = function(){ AddVisualFeedbackOnClick(settingsView, 'zoom-button', function(){
+            data.zoomLevel = Math.pow(2,index)%5;
+            settingsView.changeZoomLevelText(data);
+            index +=1;
+            if(index>2) index = 0;
+
+            let zoomFactor = data.zoomLevel;
+            camera.zoom = zoomFactor;
+
+            canvas.scale.set((1/zoomFactor), (1/zoomFactor), 1); 
+            if(stConfig.fixedSpeaker) scene.getObjectByName('subtitles').scale.set((1/zoomFactor), (1/zoomFactor), 1); 
+            camera.updateProjectionMatrix();
+        } )};
         data.menuTypeButtonFunc = function(){ AddVisualFeedbackOnClick(settingsView, menuMgr.getMenuType() == 2 ? 'enhanced-menu-button' :'traditional-menu-button', function(){ MenuFunctionsManager.getChangeMenuTypeFunction()} )};
     }
 
@@ -206,14 +221,14 @@ function MainMenuController() {
     function UpdateAccessOptionsData(){
         //Save the state of all the accessibility services.
         //In case the services is unavailable the button will be disabled and shown in grey.
-        data.isSTenabled = subController.getSubtitleEnabled();
-        data.isSLenabled = subController.getSignerEnabled();
+        data.isSTenabled = stConfig.isEnabled;
+        data.isSLenabled = slConfig.isEnabled;
         data.isADenabled = _AudioManager.getADEnabled();
         data.isASTenabled = _AudioManager.getASTEnabled();
 
         //Save the state of availability of all the accessibility services.
-        data.isSTavailable = subController.checkisSubAvailable();
-        data.isSLavailable = subController.checkisSignAvailable();
+        data.isSTavailable = _stMngr.checkisSubAvailable();
+        data.isSLavailable = _slMngr.checkisSignAvailable();
         data.isADavailable = _AudioManager.checkisADAvailable();
         data.isASTavailable = _AudioManager.checkisASTAvailable();
 
@@ -222,26 +237,17 @@ function MainMenuController() {
             AddVisualFeedbackOnClick(accessOptionsView, data.isSTenabled ? 'show-st-button' : 'disable-st-button', function(){
                 //Change the state of the subtiles from enabled to disabled and viceversa.
                 data.isSTenabled = !data.isSTenabled;
-
-                //MENU ONLY DOWN (uncomment for up/down options)
-                /*if(menuMgr.getMenuType() == 2){
-                    if ( data.isSTenabled ){
-                        menu.position.set( 0, -1 * subController.getSubPosition().y * 25, -67 );
-                    } else {
-                        menu.position.set( 0, -25, -67 );
-                    }
-                }*/
-
-
-                subController.switchSubtitles(data.isSTenabled);
-
-                SettingsOptionCtrl.UpdateView();
                 
+                _stMngr.switchSubtitles(data.isSTenabled);
+                SettingsOptionCtrl.UpdateView();
                 accessOptionsView.UpdateAccessibilityOptionsIconStatusView(data);
                 // Add interactivity to visible elements and remove interactivity to none visible elements.
                 menuMgr.AddInteractionIfVisible(viewStructure);
                 //If subtitles are disabled signer goes back to bottom position.
-                subController.setSignerPosition( subController.getSignerPosition().x, data.isSTenabled ? subController.getSubPosition().y : -1 );
+                if (!localStorage.getItem("slPosition") && _slMngr.getSigner()) {
+                    //_slMngr.setPosition(slConfig.canvasPos.x, data.isSTenabled ? stConfig.canvasPos.y : -1);
+                    _slMngr.setPosition(slConfig.canvasPos.x*Math.abs(slConfig.initPos.x), Math.abs(slConfig.initPos.y) * (data.isSTenabled ? stConfig.canvasPos.y : -1));
+                }
             });
         };
 
@@ -250,11 +256,15 @@ function MainMenuController() {
             AddVisualFeedbackOnClick(accessOptionsView, data.isSLenabled ? 'show-sl-button' : 'disable-sl-button',function(){
                 //Change the state of the signer from enabled to disabled and viceversa.
                 data.isSLenabled = !data.isSLenabled;
-                subController.switchSigner(data.isSLenabled);
+                _slMngr.switchSigner(data.isSLenabled);
                 
                 accessOptionsView.UpdateAccessibilityOptionsIconStatusView(data);
                 // Add interactivity to visible elements and remove interactivity to none visible elements.
                 menuMgr.AddInteractionIfVisible(viewStructure);
+
+                //Update the Radar position
+                //Needs if/else if position has been updated by user;
+                _rdr.updateRadarPosition();
             });
         };
 
@@ -415,13 +425,13 @@ function MainMenuController() {
      */
     this.updateAccessOptionsView = function(){
 
-        data.isSTenabled = subController.getSubtitleEnabled();
-        data.isSLenabled = subController.getSignerEnabled();
+        data.isSTenabled = stConfig.isEnabled;
+        data.isSLenabled = slConfig.isEnabled;
         data.isADenabled = _AudioManager.getADEnabled();
         data.isASTenabled = _AudioManager.getASTEnabled();
 
-        data.isSTavailable = subController.checkisSubAvailable();
-        data.isSLavailable = subController.checkisSignAvailable();
+        data.isSTavailable = _stMngr.checkisSubAvailable();
+        data.isSLavailable = _slMngr.checkisSignAvailable();
         data.isADavailable = _AudioManager.checkisADAvailable();
         data.isASTavailable = _AudioManager.checkisASTAvailable();
 
@@ -531,12 +541,11 @@ function MainMenuController() {
  * { function_description }
  *
  * @param      {<type>}  raycaster        The raycaster
- * @param      {<type>}  sliderSelection  The slider selection
+ * @param      {<type>}  elementSelection  The slider selection
  */
-    this.updatePositionOnMouseMove = function(raycaster, sliderSelection){
-        
-        if (sliderSelection) {
-            const x = sliderSelection.position.x;
+    this.updatePositionOnMove = function(raycaster, elementSelection){
+        if (elementSelection) {
+            const x = elementSelection.position.x;
 
             isSliding = true;
             // Check the position where the background menu is intersected
@@ -549,7 +558,7 @@ function MainMenuController() {
 
             if(intersects[0]){   
                 //The sliding boundries are from -(4*menuWidth/10) to +(4*menuWidth/10) which is the VPB width;           
-                if(sliderSelection.position.x > -(4*menuWidth/10) && sliderSelection.position.x < (4*menuWidth/10)){
+                if(elementSelection.position.x > -(4*menuWidth/10) && elementSelection.position.x < (4*menuWidth/10)){
 
                     // Reposition the object based on the intersection point with the background menu
                     newSliderPos  = intersects[0].object.worldToLocal(intersects[0].point).x;
@@ -567,14 +576,14 @@ function MainMenuController() {
                         data.playScaleX  = (currentTime + newSeekTime)/totalTime;
                     }
                 } else {
-                    if(Math.sign(sliderSelection.position.x) < 0){
+                    if(Math.sign(elementSelection.position.x) < 0){
                         data.videoPlayOutTimeText = VideoController.getPlayoutTime(0);
                         data.playScaleX = 0.001;
                     } else {
                         data.videoPlayOutTimeText = VideoController.getPlayoutTime(totalTime);
                         data.playScaleX  = 1;
                     }
-                    newSliderPos = Math.sign(sliderSelection.position.x) * (4*menuWidth/10);
+                    newSliderPos = Math.sign(elementSelection.position.x) * (4*menuWidth/10);
                     newSeekTime = timeDiffOnSlide(newSliderPos);
                 }
                 data.sliderPositionX = newSliderPos;
@@ -585,17 +594,17 @@ function MainMenuController() {
         }
     }
 
-    function timeDiffOnSlide(sliderSelection){
-        timeDiff = sliderSelection - initialSlidingPos;
+    function timeDiffOnSlide(elementSelection){
+        timeDiff = elementSelection - initialSlidingPos;
         if(Math.ceil(timeDiff*100) != 0){
             return Math.floor(VideoController.getListOfVideoContents()[0].vid.duration*timeDiff/(4*menuWidth/5));
         }
     }
 
-    this.onSlideSeek = function(sliderSelection){
+    this.onSlideSeek = function(elementSelection){
         if(!isSliding){
             VideoController.seekAll(newSeekTime);
-            mainMenuCtrl.playAllFunc();
+            if(actionPausedVideo) mainMenuCtrl.playAllFunc();
         }    
     }
 
@@ -609,9 +618,5 @@ function MainMenuController() {
 
     this.setInitialSlidingPosition = function(position){
         initialSlidingPos = position;
-    }
-
-    this.getInitialSlidingPosition = function(){
-        return initialSlidingPos;
     }
 }
